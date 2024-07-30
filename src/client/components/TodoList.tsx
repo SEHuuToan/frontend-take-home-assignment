@@ -1,8 +1,12 @@
+import { FC } from 'react'
+
 import type { SVGProps } from 'react'
 
 import * as Checkbox from '@radix-ui/react-checkbox'
 
 import { api } from '@/utils/client/api'
+
+import { useAutoAnimate } from '@formkit/auto-animate/react'
 
 /**
  * QUESTION 3:
@@ -62,30 +66,79 @@ import { api } from '@/utils/client/api'
  * Documentation references:
  *  - https://auto-animate.formkit.com
  */
-
-export const TodoList = () => {
+interface TodoListProps {
+  filterTabFollowStatus: 'tab1' | 'tab2' | 'tab3'
+}
+export const TodoList: FC<TodoListProps> = ({ filterTabFollowStatus }) => {
   const { data: todos = [] } = api.todo.getAll.useQuery({
     statuses: ['completed', 'pending'],
   })
+  const apiContext = api.useContext()
+  const [animate] = useAutoAnimate()
+  const { mutate: updateTodoStatus } = api.todoStatus.update.useMutation({
+    onSuccess: () => {
+      apiContext.todo.getAll.refetch()
+    },
+  })
+  const { mutate: deleteTodo } = api.todo.delete.useMutation({
+    onSuccess: () => {
+      apiContext.todo.getAll.refetch()
+    },
+  })
 
+  const handleCheckboxChange = (
+    id: number,
+    currentStatus: 'pending' | 'completed'
+  ) => {
+    updateTodoStatus({
+      todoId: id,
+      status: currentStatus === 'pending' ? 'completed' : 'pending',
+    })
+  }
+
+  const handleDeleteToDoList = (id: number) => {
+    deleteTodo({ id })
+  }
+
+  const filterTodoFollowStatus = todos.filter((todo) => {
+    if (filterTabFollowStatus === 'tab1') return true
+    if (filterTabFollowStatus === 'tab2') return todo.status === 'pending'
+    if (filterTabFollowStatus === 'tab3') return todo.status === 'completed'
+    return false
+  })
   return (
-    <ul className="grid grid-cols-1 gap-y-3">
-      {todos.map((todo) => (
-        <li key={todo.id}>
-          <div className="flex items-center rounded-12 border border-gray-200 px-4 py-3 shadow-sm">
-            <Checkbox.Root
-              id={String(todo.id)}
-              className="flex h-6 w-6 items-center justify-center rounded-6 border border-gray-300 focus:border-gray-700 focus:outline-none data-[state=checked]:border-gray-700 data-[state=checked]:bg-gray-700"
-            >
-              <Checkbox.Indicator>
-                <CheckIcon className="h-4 w-4 text-white" />
-              </Checkbox.Indicator>
-            </Checkbox.Root>
-
-            <label className="block pl-3 font-medium" htmlFor={String(todo.id)}>
-              {todo.body}
-            </label>
-          </div>
+    <ul ref={animate} className="grid grid-cols-1 gap-y-3">
+      {filterTodoFollowStatus.map((todo) => (
+        <li
+          key={todo.id}
+          className={`flex items-center font-medium rounded-12 border border-gray-200 px-4 py-3 shadow-sm ${
+            todo.status === 'completed' ? 'bg-gray-200' : ''
+          }`}
+        >
+          <Checkbox.Root
+            id={String(todo.id)}
+            className="flex h-6 w-6 items-center justify-center rounded-6 border border-gray-300 focus:border-gray-700 focus:outline-none data-[state=checked]:border-gray-700 data-[state=checked]:bg-gray-700"
+            checked={todo.status === 'completed'}
+            onCheckedChange={() => handleCheckboxChange(todo.id, todo.status)}
+          >
+            <Checkbox.Indicator>
+              <CheckIcon className="h-4 w-4 text-white" />
+            </Checkbox.Indicator>
+          </Checkbox.Root>
+          <label
+            className={`block pl-3 font-medium ${
+              todo.status === 'completed' ? 'line-through' : ''
+            }`}
+            htmlFor={String(todo.id)}
+          >
+            {todo.body}
+          </label>
+          <button
+            className="ml-auto h-8 w-8 cursor-pointer hover:bg-gray-200"
+            onClick={() => handleDeleteToDoList(todo.id)}
+          >
+            <XMarkIcon />
+          </button>
         </li>
       ))}
     </ul>
